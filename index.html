@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="author" content="Richard Oliveira Jardim">
+  <meta name="description" content="Geoportal Municipal de Carolina - MA | WebGIS Ambiental desenvolvido por Richard Oliveira Jardim">
+  <title>Geoportal Municipal de Carolina - MA | Criado por Richard Oliveira Jardim</title>
+  
+  <!-- Fontes Google Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Estilos Customizados da Aplicação -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Dados de Sumário e Metadados Pré-carregados -->
+  <script src="data/summary.js"></script>
+  <script src="data/pontos_turisticos.js"></script>
+</head>
+<body>
+
+  <!-- Loading Global Inicial -->
+  <div id="global-loader">
+    <div class="spinner"></div>
+    <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">Geoportal de Carolina - MA</h3>
+    <p id="loader-status" style="font-size: 13px; color: #94a3b8;">Carregando ambiente cartográfico e camadas...</p>
+  </div>
+
+  <!-- Header Superior -->
+  <header class="header-bar">
+    <div class="brand-wrapper">
+      <div class="brand-logo-icon">
+        <i class="fa-solid fa-map-location-dot"></i>
+      </div>
+      <div class="brand-info">
+        <div class="brand-title">
+          GEOPORTAL CAROLINA
+          <span class="brand-badge">MA</span>
+        </div>
+        <div class="brand-subtitle">
+          Sistema de Informações Geográficas &bull; <span style="color: #1b5e20; font-weight: 600;"><i class="fa-solid fa-code"></i> Por Richard Oliveira Jardim</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações e Ferramentas do Header -->
+    <div class="header-actions">
+      <button class="btn-header active" id="btn-toggle-sidebar" title="Alternar Painel de Controle">
+        <i class="fa-solid fa-layer-group"></i>
+        <span>Camadas</span>
+      </button>
+
+      <button class="btn-header" id="btn-toggle-dashboard" title="Dashboard de Indicadores Ambientais">
+        <i class="fa-solid fa-chart-pie"></i>
+        <span>Estatísticas</span>
+      </button>
+
+      <button class="btn-header" id="btn-toggle-table" title="Tabela de Atributos">
+        <i class="fa-solid fa-table-list"></i>
+        <span>Tabela</span>
+      </button>
+
+      <button class="btn-header" id="btn-import-kml" title="Importar arquivo KML ou GeoJSON da sua propriedade">
+        <i class="fa-solid fa-file-arrow-up"></i>
+        <span>Importar KML</span>
+      </button>
+      <input type="file" id="file-kml-input" accept=".kml,.geojson,.json" style="display:none;">
+
+      <button class="btn-header btn-icon-only" id="btn-reset-view" title="Enquadrar Município (Home)">
+        <i class="fa-solid fa-house"></i>
+      </button>
+
+      <button class="btn-header btn-icon-only" id="btn-fullscreen" title="Tela Cheia">
+        <i class="fa-solid fa-expand"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mapa Principal -->
+  <div id="map"></div>
+
+  <!-- Barra Flutuante de Ferramentas de Desenho e Medição -->
+  <div class="map-floating-tools">
+    <div class="tool-btn-group">
+      <button class="map-tool-btn" id="tool-zoom-in" title="Aproximar Zoom">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+      <button class="map-tool-btn" id="tool-zoom-out" title="Afastar Zoom">
+        <i class="fa-solid fa-minus"></i>
+      </button>
+      <button class="map-tool-btn" id="tool-locate" title="Minha Localização (GPS)">
+        <i class="fa-solid fa-crosshairs"></i>
+      </button>
+    </div>
+
+    <div class="tool-btn-group">
+      <button class="map-tool-btn" id="tool-measure-distance" title="Régua: Medir Distância">
+        <i class="fa-solid fa-ruler"></i>
+      </button>
+      <button class="map-tool-btn" id="tool-measure-area" title="Polígono: Medir Área">
+        <i class="fa-solid fa-draw-polygon"></i>
+      </button>
+      <button class="map-tool-btn" id="tool-clear-measure" title="Limpar Medições" style="display:none; color: #ef4444;">
+        <i class="fa-solid fa-trash-can"></i>
+      </button>
+    </div>
+
+    <div class="tool-btn-group">
+      <button class="map-tool-btn" id="tool-print" title="Capturar / Imprimir Mapa">
+        <i class="fa-solid fa-camera"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Caixa Flutuante com Resultado da Medição -->
+  <div class="measure-info-box" id="measure-box">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <strong id="measure-title"><i class="fa-solid fa-ruler-combined"></i> Medição</strong>
+      <span style="cursor:pointer; font-size:14px;" id="measure-close">&times;</span>
+    </div>
+    <div id="measure-result" style="font-size:14px; font-weight:700; color:#4ade80;">0,00 km</div>
+    <div id="measure-hint" style="font-size:10.5px; color:#cbd5e1; margin-top:4px;">Clique no mapa para traçar os pontos. Clique duplo para finalizar.</div>
+  </div>
+
+  <!-- Painel Lateral Retrátil (Sidebar) -->
+  <aside class="sidebar" id="sidebar">
+    <!-- Abas da Sidebar -->
+    <nav class="sidebar-tabs">
+      <button class="tab-btn active" data-tab="tab-layers">
+        <i class="fa-solid fa-layer-group"></i>
+        <span>Camadas</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-basemaps">
+        <i class="fa-solid fa-map"></i>
+        <span>Fundo</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-filters">
+        <i class="fa-solid fa-filter"></i>
+        <span>Filtros</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-analytics">
+        <i class="fa-solid fa-chart-column"></i>
+        <span>Análise</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-info">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>Sobre</span>
+      </button>
+    </nav>
+
+    <!-- Conteúdo da Sidebar -->
+    <div class="sidebar-content">
+
+      <!-- ABA 1: CAMADAS TEMÁTICAS -->
+      <div class="tab-pane active" id="tab-layers">
+        <div class="panel-section-title">
+          <span>Camadas Territoriais & CAR</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn-layer-action" id="btn-activate-all">Todas</button>
+            <button class="btn-layer-action" id="btn-deactivate-all">Nenhuma</button>
+          </div>
+        </div>
+
+        <!-- 1. Limite Municipal -->
+        <div class="layer-card" id="card-limite_municipal">
+          <div class="layer-card-header">
+            <div class="layer-info-left" data-layer="limite_municipal">
+              <span class="layer-swatch" style="background: transparent; border: 2px dashed #000000;"></span>
+              <div>
+                <div class="layer-title-text">Limite Municipal</div>
+                <div class="layer-subtext">Carolina - MA (IBGE 2102804)</div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-limite_municipal" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="layer-controls-body">
+            <div class="opacity-slider-row">
+              <span>Opacidade:</span>
+              <input type="range" class="range-slider" min="0" max="1" step="0.05" value="0.9" data-layer="limite_municipal">
+              <span class="opacity-val">90%</span>
+            </div>
+            <div class="layer-actions-row">
+              <span class="status-pill status-ready">Pronto</span>
+              <button class="btn-layer-action btn-zoom-layer" data-layer="limite_municipal">
+                <i class="fa-solid fa-crosshairs"></i> Enquadrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Vegetação Nativa -->
+        <div class="layer-card" id="card-vegetacao_nativa">
+          <div class="layer-card-header">
+            <div class="layer-info-left" data-layer="vegetacao_nativa">
+              <span class="layer-swatch" style="background: #2e7d32;"></span>
+              <div>
+                <div class="layer-title-text">Vegetação Nativa</div>
+                <div class="layer-subtext">
+                  <span id="badge-count-vegetacao_nativa">1.643 feições</span> &bull; 
+                  <span id="badge-area-vegetacao_nativa">297.223 ha</span>
+                </div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-vegetacao_nativa" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="layer-controls-body">
+            <div class="opacity-slider-row">
+              <span>Opacidade:</span>
+              <input type="range" class="range-slider" min="0" max="1" step="0.05" value="0.75" data-layer="vegetacao_nativa">
+              <span class="opacity-val">75%</span>
+            </div>
+            <div class="layer-actions-row">
+              <span class="status-pill status-ready" id="status-vegetacao_nativa">Ativo</span>
+              <button class="btn-layer-action btn-zoom-layer" data-layer="vegetacao_nativa">
+                <i class="fa-solid fa-crosshairs"></i> Enquadrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Área Consolidada -->
+        <div class="layer-card" id="card-area_consolidada">
+          <div class="layer-card-header">
+            <div class="layer-info-left" data-layer="area_consolidada">
+              <span class="layer-swatch" style="background: #e65100;"></span>
+              <div>
+                <div class="layer-title-text">Área Consolidada</div>
+                <div class="layer-subtext">
+                  <span id="badge-count-area_consolidada">1.894 feições</span> &bull; 
+                  <span id="badge-area-area_consolidada">206.698 ha</span>
+                </div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-area_consolidada" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="layer-controls-body">
+            <div class="opacity-slider-row">
+              <span>Opacidade:</span>
+              <input type="range" class="range-slider" min="0" max="1" step="0.05" value="0.75" data-layer="area_consolidada">
+              <span class="opacity-val">75%</span>
+            </div>
+            <div class="layer-actions-row">
+              <span class="status-pill status-ready" id="status-area_consolidada">Ativo</span>
+              <button class="btn-layer-action btn-zoom-layer" data-layer="area_consolidada">
+                <i class="fa-solid fa-crosshairs"></i> Enquadrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. APP (Área de Preservação Permanente) -->
+        <div class="layer-card" id="card-app">
+          <div class="layer-card-header">
+            <div class="layer-info-left" data-layer="app">
+              <span class="layer-swatch" style="background: #00897b;"></span>
+              <div>
+                <div class="layer-title-text">Área de Preservação (APP)</div>
+                <div class="layer-subtext">
+                  <span id="badge-count-app">4.683 feições</span> &bull; 
+                  <span id="badge-area-app">37.437 ha</span>
+                </div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-app" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="layer-controls-body">
+            <div class="opacity-slider-row">
+              <span>Opacidade:</span>
+              <input type="range" class="range-slider" min="0" max="1" step="0.05" value="0.8" data-layer="app">
+              <span class="opacity-val">80%</span>
+            </div>
+            <div class="layer-actions-row">
+              <span class="status-pill status-ready" id="status-app">Ativo</span>
+              <button class="btn-layer-action btn-zoom-layer" data-layer="app">
+                <i class="fa-solid fa-crosshairs"></i> Enquadrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Hidrografia -->
+        <div class="layer-card" id="card-hidrografia">
+          <div class="layer-card-header">
+            <div class="layer-info-left" data-layer="hidrografia">
+              <span class="layer-swatch" style="background: #0288d1;"></span>
+              <div>
+                <div class="layer-title-text">Hidrografia (Cursos d'Água)</div>
+                <div class="layer-subtext">
+                  <span id="badge-count-hidrografia">1.880 feições</span> &bull; 
+                  <span id="badge-area-hidrografia">12.608 ha</span>
+                </div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-hidrografia" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="layer-controls-body">
+            <div class="opacity-slider-row">
+              <span>Opacidade:</span>
+              <input type="range" class="range-slider" min="0" max="1" step="0.05" value="0.85" data-layer="hidrografia">
+              <span class="opacity-val">85%</span>
+            </div>
+            <div class="layer-actions-row">
+              <span class="status-pill status-ready" id="status-hidrografia">Ativo</span>
+              <button class="btn-layer-action btn-zoom-layer" data-layer="hidrografia">
+                <i class="fa-solid fa-crosshairs"></i> Enquadrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Atrativos Turísticos & Chapada das Mesas -->
+        <div class="layer-card" id="card-pontos_turisticos">
+          <div class="layer-card-header">
+            <div class="layer-info-left" data-layer="pontos_turisticos">
+              <span class="layer-swatch" style="background: #f59e0b; border-radius: 50%;"></span>
+              <div>
+                <div class="layer-title-text">Atrativos Ecoturísticos</div>
+                <div class="layer-subtext">Chapada das Mesas & Carolina (9 locais)</div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-pontos_turisticos" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="layer-controls-body">
+            <div class="layer-actions-row">
+              <span class="status-pill status-ready">9 Pontos</span>
+              <button class="btn-layer-action btn-zoom-layer" data-layer="pontos_turisticos">
+                <i class="fa-solid fa-crosshairs"></i> Enquadrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Camada Importada pelo Usuário (KML / GeoJSON) -->
+        <div class="layer-card" id="card-camada_importada" style="display:none; border-color: #a855f7; background: #faf5ff;">
+          <div class="layer-card-header">
+            <div class="layer-info-left" data-layer="camada_importada">
+              <span class="layer-swatch" style="background: #a855f7;"></span>
+              <div>
+                <div class="layer-title-text" id="imported-layer-title" style="color: #7e22ce;">Camada do Usuário</div>
+                <div class="layer-subtext" id="imported-layer-subtext">0 feições carregadas</div>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-camada_importada" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="layer-controls-body">
+            <div class="opacity-slider-row">
+              <span>Opacidade:</span>
+              <input type="range" class="range-slider" min="0" max="1" step="0.05" value="0.8" data-layer="camada_importada">
+              <span class="opacity-val">80%</span>
+            </div>
+            <div class="layer-actions-row">
+              <span class="status-pill" style="background:#f3e8ff; color:#7e22ce;" id="imported-area-badge">0 ha</span>
+              <div style="display:flex; gap:4px;">
+                <button class="btn-layer-action btn-zoom-layer" data-layer="camada_importada">
+                  <i class="fa-solid fa-crosshairs"></i> Enquadrar
+                </button>
+                <button class="btn-layer-action" id="btn-remove-imported" style="color:#ef4444; border-color:#fca5a5; background:#fef2f2;">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 2: MAPAS DE FUNDO (BASEMAPS) -->
+      <div class="tab-pane" id="tab-basemaps">
+        <div class="panel-section-title">
+          <span>Selecione o Mapa de Fundo</span>
+        </div>
+        <div class="basemap-grid">
+          <!-- 1. Satélite Esri -->
+          <div class="basemap-card active" data-basemap="satellite">
+            <div class="basemap-thumb" style="background-image: url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/4/8/6');"></div>
+            <div class="basemap-name"><i class="fa-solid fa-satellite"></i> Satélite Esri</div>
+          </div>
+
+          <!-- 2. OpenStreetMap Padrão -->
+          <div class="basemap-card" data-basemap="osm">
+            <div class="basemap-thumb" style="background-image: url('https://tile.openstreetmap.org/4/6/8.png');"></div>
+            <div class="basemap-name"><i class="fa-solid fa-map"></i> OpenStreetMap</div>
+          </div>
+
+          <!-- 3. CartoDB Dark Matter -->
+          <div class="basemap-card" data-basemap="dark">
+            <div class="basemap-thumb" style="background-image: url('https://a.basemaps.cartocdn.com/dark_all/4/6/8.png');"></div>
+            <div class="basemap-name"><i class="fa-solid fa-moon"></i> CartoDB Escuro</div>
+          </div>
+
+          <!-- 4. Topográfico / Relevo -->
+          <div class="basemap-card" data-basemap="topo">
+            <div class="basemap-thumb" style="background-image: url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/4/8/6');"></div>
+            <div class="basemap-name"><i class="fa-solid fa-mountain-sun"></i> Topográfico</div>
+          </div>
+        </div>
+
+        <div class="panel-section-title" style="margin-top: 18px;">
+          <span>Opções de Sobreposição</span>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:13px; font-weight:600; color:#1e293b;">Rótulos de Vias e Lugares</div>
+              <div style="font-size:11px; color:#64748b;">Nomes de cidades, vias e referências</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-basemap-labels" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 3: FILTROS E BUSCA -->
+      <div class="tab-pane" id="tab-filters">
+        <div class="panel-section-title">
+          <span>Consulta Espacial & Filtros</span>
+        </div>
+        
+        <div class="filter-form-group">
+          <label class="filter-label">Camada Alvo para Filtrar:</label>
+          <select class="filter-select" id="filter-layer-select">
+            <option value="app">Área de Preservação Permanente (APP)</option>
+            <option value="vegetacao_nativa">Vegetação Nativa</option>
+            <option value="area_consolidada">Área Consolidada</option>
+            <option value="hidrografia">Hidrografia</option>
+          </select>
+        </div>
+
+        <div class="filter-form-group">
+          <label class="filter-label">Código do Imóvel (CAR):</label>
+          <input type="text" class="filter-input" id="filter-car-code" placeholder="Ex: MA-2102804-...">
+        </div>
+
+        <div class="filter-form-group">
+          <label class="filter-label">Tema / Categoria:</label>
+          <select class="filter-select" id="filter-theme-select">
+            <option value="">Todos os temas</option>
+          </select>
+        </div>
+
+        <div class="filter-form-group">
+          <label class="filter-label">Condição Cadastral:</label>
+          <select class="filter-select" id="filter-condition-select">
+            <option value="">Todas as condições</option>
+          </select>
+        </div>
+
+        <div class="filter-form-group">
+          <label class="filter-label">Área Mínima (ha):</label>
+          <input type="number" class="filter-input" id="filter-min-area" placeholder="0" min="0" step="0.5">
+        </div>
+
+        <button class="btn-filter-submit" id="btn-apply-filter">
+          <i class="fa-solid fa-magnifying-glass"></i> Aplicar Filtros
+        </button>
+        <button class="btn-filter-reset" id="btn-reset-filter">
+          <i class="fa-solid fa-rotate-left"></i> Limpar Filtros
+        </button>
+
+        <div id="filter-stats-badge" style="margin-top:14px; display:none; padding:10px; background:#e0f2fe; border-radius:6px; font-size:12px; color:#0369a1; text-align:center;">
+          <strong id="filter-count-match">0</strong> feições encontradas no filtro.
+        </div>
+      </div>
+
+      <!-- ABA 4: DASHBOARD AMBIENTAL -->
+      <div class="tab-pane" id="tab-analytics">
+        <div class="panel-section-title">
+          <span>Resumo Territorial de Carolina</span>
+        </div>
+
+        <div class="stat-card-grid">
+          <div class="stat-card">
+            <span class="stat-card-label">ÁREA DO MUNICÍPIO</span>
+            <span class="stat-card-value">6.267,6 <span style="font-size:12px; font-weight:500;">km²</span></span>
+            <span class="stat-card-sub">626.760,1 ha</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">VEGETAÇÃO NATIVA</span>
+            <span class="stat-card-value" style="color: #2e7d32;">47,4%</span>
+            <span class="stat-card-sub">297.223,9 ha</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">ÁREA CONSOLIDADA</span>
+            <span class="stat-card-value" style="color: #e65100;">33,0%</span>
+            <span class="stat-card-sub">206.698,9 ha</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">TOTAL APP (CAR)</span>
+            <span class="stat-card-value" style="color: #00897b;">37.437 <span style="font-size:12px; font-weight:500;">ha</span></span>
+            <span class="stat-card-sub">4.683 polígonos</span>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-title"><i class="fa-solid fa-chart-pie"></i> Composição Territorial de Carolina (ha)</div>
+          <canvas id="chart-land-use" height="190"></canvas>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-title"><i class="fa-solid fa-chart-bar"></i> Status dos Cadastros Ambientais</div>
+          <canvas id="chart-conditions" height="180"></canvas>
+        </div>
+      </div>
+
+      <!-- ABA 5: SOBRE O GEOPORTAL -->
+      <div class="tab-pane" id="tab-info">
+        <div class="panel-section-title">
+          <span>Criador & Informações</span>
+        </div>
+        
+        <div style="font-size:12.5px; color:#334155; line-height:1.6; display:flex; flex-direction:column; gap:12px;">
+          <!-- Card de Autoria / Criador -->
+          <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; border-radius: 10px; padding: 14px; box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.1);">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg, #1b5e20, #2e7d32); display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff; border: 2px solid #4ade80; flex-shrink:0;">
+                <i class="fa-solid fa-user-tie"></i>
+              </div>
+              <div>
+                <div style="font-size:14.5px; font-weight:700; color:#f8fafc; letter-spacing:-0.2px;">Richard Oliveira Jardim</div>
+                <div style="font-size:11.5px; color:#94a3b8;">Criador e Desenvolvedor do Geoportal</div>
+                <div style="display:flex; gap:6px; margin-top:4px;">
+                  <span style="font-size:10px; background:#1b5e20; color:#bbf7d0; padding:2px 7px; border-radius:12px; font-weight:600;">Autor &bull; WebGIS</span>
+                  <span style="font-size:10px; background:#0288d1; color:#e0f2fe; padding:2px 7px; border-radius:12px; font-weight:600;">Geotecnologias</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p>
+            O <strong>Geoportal Municipal de Carolina - MA</strong> é um ambiente cartográfico interativo desenvolvido para visualização, análise e consulta dos dados territoriais e ambientais do município.
+          </p>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+            <div style="font-weight:700; color:#0f172a; margin-bottom:4px;"><i class="fa-solid fa-mountain"></i> Carolina - Maranhão</div>
+            <div><strong>Código IBGE:</strong> 2102804</div>
+            <div><strong>Região:</strong> Sul do Maranhão / Chapada das Mesas</div>
+            <div><strong>Bioma:</strong> Cerrado com transição Amazônica</div>
+            <div><strong>Bacia:</strong> Bacia Hidrográfica do Rio Tocantins</div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+            <div style="font-weight:700; color:#0f172a; margin-bottom:4px;"><i class="fa-solid fa-database"></i> Fontes Cartográficas</div>
+            <div>&bull; <strong>IBGE:</strong> Malha Municipal Oficial (SIRGAS 2000)</div>
+            <div>&bull; <strong>SICAR / MMA:</strong> Cadastro Ambiental Rural</div>
+            <div>&bull; <strong>Sistemas de Projeção:</strong> SIRGAS 2000 / WGS 84 (EPSG:4326)</div>
+          </div>
+
+          <div style="font-size:11px; color:#64748b; text-align:center; margin-top:8px; line-height:1.4;">
+            <strong>Geoportal de Carolina - MA</strong><br>
+            Desenvolvido por <strong>Richard Oliveira Jardim</strong>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- Tabela de Atributos Inferior (Drawer) -->
+  <section class="attribute-drawer collapsed" id="attribute-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <i class="fa-solid fa-table-list" style="color: #1b5e20;"></i>
+        <span>Tabela de Atributos:</span>
+        <select class="filter-select" id="table-layer-select" style="width: auto; padding: 4px 8px; font-weight: 600;">
+          <option value="app">Área de Preservação (APP)</option>
+          <option value="vegetacao_nativa">Vegetação Nativa</option>
+          <option value="area_consolidada">Área Consolidada</option>
+          <option value="hidrografia">Hidrografia</option>
+        </select>
+      </div>
+
+      <div class="drawer-controls">
+        <input type="text" class="filter-input" id="table-quick-search" placeholder="Buscar texto na tabela..." style="width: 200px; padding: 4px 8px;">
+        <button class="btn-header" id="btn-export-csv" title="Exportar dados para CSV">
+          <i class="fa-solid fa-file-csv"></i> CSV
+        </button>
+        <button class="btn-header" id="btn-export-geojson" title="Exportar GeoJSON">
+          <i class="fa-solid fa-download"></i> GeoJSON
+        </button>
+        <button class="btn-header btn-icon-only" id="btn-close-table" title="Fechar Tabela">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="drawer-table-wrapper" id="table-container">
+      <table class="gis-table" id="attributes-table">
+        <thead id="table-head">
+          <!-- Gerado dinamicamente -->
+        </thead>
+        <tbody id="table-body">
+          <!-- Gerado dinamicamente -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="drawer-footer">
+      <div id="table-info-counter">Exibindo 0 registros</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn-header" id="table-page-prev" style="height:26px; padding:0 8px;"><i class="fa-solid fa-chevron-left"></i></button>
+        <span id="table-page-current" style="font-weight:600;">Pág 1 / 1</span>
+        <button class="btn-header" id="table-page-next" style="height:26px; padding:0 8px;"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Barra de Status Inferior -->
+  <footer class="bottom-status-bar">
+    <div class="status-badge-group">
+      <div class="status-badge" id="coord-display">
+        <i class="fa-solid fa-location-crosshairs"></i> Lat: -7.4529 | Lon: -47.2275
+      </div>
+      <div class="status-badge" id="zoom-display">
+        Zoom: 9
+      </div>
+    </div>
+
+    <div class="status-badge-group">
+      <div class="status-badge">
+        SIRGAS 2000 / EPSG:4326
+      </div>
+      <div class="status-badge" style="font-weight:600; color:#1b5e20;">
+        <i class="fa-solid fa-code"></i> Desenvolvido por Richard Oliveira Jardim
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal de Ficha Técnica / Relatório Ambiental em PDF -->
+  <div id="report-modal" class="report-modal-overlay" style="display:none;">
+    <div class="report-container">
+      <div class="report-actions-bar">
+        <button class="btn-header" style="background:#1b5e20; color:#fff;" onclick="window.printReport()">
+          <i class="fa-solid fa-print"></i> Imprimir / Salvar em PDF
+        </button>
+        <button class="btn-header" onclick="window.closeReport()">
+          <i class="fa-solid fa-xmark"></i> Fechar
+        </button>
+      </div>
+      <div id="report-printable-area" class="report-paper">
+        <!-- Conteúdo do relatório gerado dinamicamente -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts Essenciais -->
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Chart.js para Dashboard -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- html2canvas para captura de tela -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  
+  <!-- Aplicação WebGIS -->
+  <script src="js/app.js"></script>
+</body>
+</html>
